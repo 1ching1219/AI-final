@@ -3,7 +3,6 @@ import numpy as np
 import threading
 
 pygame.init()
-
 class Sheep(pygame.sprite.Sprite):
     def __init__(self, filename, initial_position):
         pygame.sprite.Sprite.__init__(self)
@@ -19,7 +18,7 @@ class Sheep(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.topleft = initial_position
         self.speed = [0, 0]
-        self.live = 50
+        self.live = 100
 
     def move(self):
         self.rect = self.rect.move(self.speed)
@@ -41,8 +40,8 @@ class Wolf(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.image.load(filename)
         self.imagelist=[]
-        wolf_img = ['wolf/1.png', 'wolf/2.png', 'wolf/3.png', 'wolf/4.png', 'wolf/5.png', 'wolf/6.png']
-        for wolf in wolf_img:
+        wolfs_img = ['wolf/1.png', 'wolf/2.png', 'wolf/3.png', 'wolf/4.png', 'wolf/5.png', 'wolf/6.png']
+        for wolf in wolfs_img:
             tmp = pygame.image.load(wolf)
             tmp = pygame.transform.scale(tmp, (70, 42))
             self.imagelist.append(tmp)
@@ -51,12 +50,12 @@ class Wolf(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(self.image, (70, 42))
         self.rect = self.image.get_rect()
         self.rect.topleft = initial_position
-        self.live = 80
         self.speed = [0, 0]
-
+        self.live = 100
+        
     def move(self):
         self.rect = self.rect.move(self.speed)
-        self.live -= 0.5
+        self.live -= 0.3
         if self.rect.top > 750:
             self.rect.bottom = 0
         if self.rect.bottom < 0:
@@ -89,9 +88,9 @@ window.fill([147, 211, 52])
 sheep_img = 'sheep/1.png'
 grassimg = 'grass.png'
 wolf_img = 'wolf/1.png'
-sheep_initial_num = 10
-grass_initial_num = 60
-wolf_initial_num = 2
+sheep_initial_num = 20
+grass_initial_num = 150
+wolf_initial_num = 5
 locationGroup = []
 grasslocation = []
 wolflocation = []
@@ -135,6 +134,7 @@ while 1:
     wolf_map = []
     count_SheepGrass_distance = []
     count_WolfSheep_distance = []
+    count_sheepwolf_distance = []
     
 
     # draw grass
@@ -146,12 +146,14 @@ while 1:
             if([grass.rect.centerx, grass.rect.centery] in grass_map and [grass.rect[0], grass.rect[1]] in grasslocation):
                 if [sheep.rect.centerx, sheep.rect.centery] == [grass.rect.centerx, grass.rect.centery]:
                         grass.die()
-                        sheep.live += 12
+                        sheep.live += 10
                         grass_map.remove([grass.rect.centerx, grass.rect.centery])
                         grasslocation.remove([grass.rect[0], grass.rect[1]])
-                        grasslocation.append([random.randint(10, 1000), random.randint(10, 720)])
+                        if(random.randint(1, 3)==3):
+                            grasslocation.append([random.randint(10, 1000), random.randint(10, 720)])
                 
-
+    if(random.randint(1, 500) >= 450):
+        grasslocation.append([random.randint(10, 1000), random.randint(10, 720)])
   
     # draw and move sheep
     time = 0
@@ -171,16 +173,62 @@ while 1:
         for wolf in WolfGroup.sprites():
             wolf_map.append([wolf.rect.centerx, wolf.rect.centery])
             if([x, y] in sheep_map):
-                if pygame.Rect.colliderect(sheep.rect, wolf.rect):
-                    sheep.die()
-                    locationGroup.remove(locationGroup[idx])
-                    wolf.live += 14
-                    sheep_map.remove([x, y])
+                    if pygame.Rect.colliderect(sheep.rect, wolf.rect):
+                        wolf.live += sheep.live / 2
+                        sheep.die()
+                        locationGroup.remove(locationGroup[idx])
+                        sheep_map.remove([x, y])
             distance = (wolf.rect.centerx - x)**2 + (wolf.rect.centery - y)**2
+            count_sheepwolf_distance.append(distance)
+
             if(distance <= 50000):
-                print('coming')
                 coming = 1
-                nextstep = [(x - wolf.rect.centerx), (y - wolf.rect.centery)]
+
+                # min_value = min(count_sheepwolf_distance)
+                # min_index = count_sheepwolf_distance.index(min_value)
+                # x, y = wolf_map[min_index]
+                # nextstep = [(sheep.rect.centerx - x), (sheep.rect.centery - y)]
+
+                # # nextstep = [(x - wolf.rect.centerx), (y - wolf.rect.centery)]
+                # if nextstep[0] > 0: dx = 1
+                # elif nextstep[0] < 0: dx = -1
+                # else: dx = 0
+                # if nextstep[1] > 0:dy = 1
+                # elif nextstep[1] < 0: dy = -1
+                # else: dy = 0
+                # if((dx + dy) == 1 or (dx + dy) == -1):
+                #     dx *= 1.4142
+                #     dy *= 1.4142
+        if coming:
+            
+            min_value = min(count_sheepwolf_distance)
+            min_index = count_sheepwolf_distance.index(min_value)
+            x, y = wolf_map[min_index]
+            nextstep = [(sheep.rect.centerx - x), (sheep.rect.centery - y)]
+
+            if nextstep[0] > 0: dx = 1
+            elif nextstep[0] < 0: dx = -1
+            else: dx = 0
+            if nextstep[1] > 0:dy = 1
+            elif nextstep[1] < 0: dy = -1
+            else: dy = 0
+            if((dx + dy) == 1 or (dx + dy) == -1):
+                dx *= 1.4142
+                dy *= 1.4142
+
+        else:
+            # calculate next(consider grass)
+            for position in grass_map:
+                x, y = position
+                distance = (sheep.rect.centerx - x)**2 + (sheep.rect.centery - y)**2
+                count_SheepGrass_distance.append(distance)
+
+                min_value = min(count_SheepGrass_distance)
+                min_index = count_SheepGrass_distance.index(min_value)
+                x, y = grass_map[min_index]
+                nextstep = [(x - sheep.rect.centerx), (y - sheep.rect.centery)]
+
+                #next stop
                 if nextstep[0] > 0: dx = 1
                 elif nextstep[0] < 0: dx = -1
                 else: dx = 0
@@ -191,32 +239,6 @@ while 1:
                 if((dx + dy) == 1 or (dx + dy) == -1):
                     dx *= 1.4142
                     dy *= 1.4142
-
-
-        # calculate next(consider grass)
-        for position in grass_map:
-            x, y = position
-            distance = (sheep.rect.centerx - x)**2 + (sheep.rect.centery - y)**2
-            count_SheepGrass_distance.append(distance)
-
-        if(not coming):
-            print('not coming')
-            min_value = min(count_SheepGrass_distance)
-            min_index = count_SheepGrass_distance.index(min_value)
-            x, y = grass_map[min_index]
-            nextstep = [(x - sheep.rect.centerx), (y - sheep.rect.centery)]
-
-            #next stop
-            if nextstep[0] > 0: dx = 1
-            elif nextstep[0] < 0: dx = -1
-            else: dx = 0
-            if nextstep[1] > 0:dy = 1
-            elif nextstep[1] < 0: dy = -1
-            else: dy = 0
-
-            if((dx + dy) == 1 or (dx + dy) == -1):
-                dx *= 1.4142
-                dy *= 1.4142
             
         # send info
         sheep.speed = [dx, dy]
@@ -225,13 +247,14 @@ while 1:
             sheep.die()
             locationGroup.remove(locationGroup[idx])
             
-        if(sheep.live >= 60):
-            sheep.live -= 20
+        if(sheep.live >= 120):
+            sheep.live -= 50
             l = [random.randint(10, 1000), random.randint(10, 720)]
             locationGroup.append(l)
             SheepGroup.add(Sheep(sheep_img, l))
 
         count_SheepGrass_distance = []
+        count_sheepwolf_distance = []
 
         
     # draw new grass
@@ -252,11 +275,11 @@ while 1:
             wolf.die()
             wolflocation.remove(wolflocation[idx])
 
-        if wolf.live >= 100:
-            wolf.live -= 50
+        if wolf.live >= 200:
+            wolf.live -= 80
             l = [random.randint(10, 1000), random.randint(10, 720)]
             wolflocation.append(l)
-            WolfGroup.add(Sheep(sheep_img, l))
+            WolfGroup.add(Wolf(wolf_img, l))
 
         if wolf.speed[0] < 0:
             window.blit(pygame.transform.flip(wolf.imagelist[wolf_indx], True, False), wolf.rect)
@@ -274,17 +297,17 @@ while 1:
         nextstep = [(x - wolf.rect.centerx), (y - wolf.rect.centery)]
 
         #next stop
-        if (nextstep[0] < 2.5 and nextstep[0] > 0) or (nextstep[0] > -2.5 and nextstep[0] < 0):dx=nextstep[0]
-        elif nextstep[0] > 0: dx = 2.5
-        elif nextstep[0] < 0: dx = -2.5
+        if (nextstep[0] < 2 and nextstep[0] > 0) or (nextstep[0] > -2 and nextstep[0] < 0):dx=nextstep[0]
+        elif nextstep[0] > 0: dx = 2
+        elif nextstep[0] < 0: dx = -2
         else: dx = 0
 
-        if (nextstep[1] < 2.5 and nextstep[1] > 0) or (nextstep[1] > -2.5 and nextstep[1] < 0):dy=nextstep[1]
-        elif nextstep[1] > 0:dy = 2.5
-        elif nextstep[1] < 0: dy = -2.5
+        if (nextstep[1] < 2 and nextstep[1] > 0) or (nextstep[1] > -2 and nextstep[1] < 0):dy=nextstep[1]
+        elif nextstep[1] > 0:dy = 2
+        elif nextstep[1] < 0: dy = -2
         else: dy = 0
 
-        if((dx + dy) == 2.5 or (dx + dy) == -2.5):
+        if((dx + dy) == 2 or (dx + dy) == -2):
             dx *= 1.4142
             dy *= 1.4142
         
