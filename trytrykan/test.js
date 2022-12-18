@@ -1,7 +1,8 @@
 window.onload = function(){
     var canvas = document.getElementById('background');
+    var grass_num = 150;
     var sheep_num = 20;
-    var wolf_num = 2;
+    var wolf_num = 5;
 
     var ctx = canvas.getContext("2d");
     var maxWidth = canvas.width, maxHeight = canvas.height;
@@ -12,25 +13,33 @@ window.onload = function(){
             Math.random() * (maxNum - minNum) + minNum);
     }
 
+    // 草
+    class Grass{
+        constructor(){
+            this.length = 15;
+            this.color  = "#95ef5c";
+            this.x = getRandomNum(this.length, maxWidth - this.length);
+            this.y = getRandomNum(this.length, maxHeight - this.length);
+        }
+        draw(){
+            ctx.beginPath();
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.length, this.length);
+            ctx.fill();
+            ctx.closePath();
+        }
+    }
+
     class Animal{
-        constructor(r, speed, x, y, energy){      
-            // this.ctx = ctx;
-            // this.maxWidth = maxWidth;
-            // this.maxHeight = maxHeight;
+        constructor(){      
             // 随机半径
             this.r = 10;
             // 随机x,y坐标
             this.x = getRandomNum(this.r, maxWidth - this.r);
             this.y = getRandomNum(this.r, maxHeight - this.r);
-            // this.x = getRandomNum(1, maxWidth/(this.r*2)) * this.r*2 + this.r;
-            // this.y = getRandomNum(1, maxHeight/(this.r*2)) * this.r*2 +this.r;
-            // 平移速度,正负区间是为了移动方向多样
-            // this.speed = this.r*2;
-            this.speed = 1;
-            // 颜色
+            // this.speed = 1; // 速度
             this.energy = 100;
         }
-
         draw() {
             ctx.beginPath();
             ctx.fillStyle = this.color;
@@ -38,24 +47,77 @@ window.onload = function(){
             ctx.fill();
             ctx.closePath();
         }
-        // move() {
-        //     this.x += getRandomNum(-1, 1) * this.speed;
-        //     this.y += getRandomNum(-1, 1) * this.speed;
-        //     this.energy -= 1;
-        // }
     }
 
     // 羊
     class Sheep extends Animal{
-        constructor(color){
+        constructor(){
             super();
             this.color = '#ffffff';
+            this.speed = 1;
         }
         move() {
-            // 羊random走
-            this.x += getRandomNum(-1, 1) * this.speed;
-            this.y += getRandomNum(-1, 1) * this.speed;
-            this.energy -= 1;
+            let wolf_dis = [];
+            let grass_dis = [];
+            let SW_distance = [];
+            let SG_distance = [];
+            let run_direct = [];
+            let wolf_enemy = -1;
+            this.energy -= 0.1;
+
+            if(wolf_num > 0){
+                for(let n = 0; n < wolf_num; n++){
+                    wolf_dis[n] = (wolves[n].x-this.x)**2 + (wolves[n].y - this.y)**2
+                    SW_distance.push(wolf_dis[n]);
+                }
+                SW_distance.sort(function(a, b) {return a - b;})
+                wolf_enemy = wolf_dis.indexOf(SW_distance[0]);
+                run_direct[0] = -1 * Math.sign(wolves[wolf_enemy].x-this.x);
+                run_direct[1] = -1 * Math.sign(wolves[wolf_enemy].y-this.y);
+            }
+                if(wolf_enemy > -1 && wolf_dis[wolf_enemy] <= 5000){
+                    this.x += run_direct[0] * this.speed;
+                    this.y += run_direct[1] * this.speed;
+                }
+                else{
+                    if(grass_num > 0){
+                        // 抓最近的草
+                        for(let n = 0; n < grass_num; n++){
+                            grass_dis[n] = (grass[n].x-this.x)**2 + (grass[n].y - this.y)**2
+                            SG_distance.push(grass_dis[n]);
+                        }
+                        SG_distance.sort(function(a, b) {return a - b;})
+                        let grass_target = grass_dis.indexOf(SG_distance[0]); // 最近的草的index
+    
+                        let next_step = [(grass[grass_target].x-this.x), (grass[grass_target].y-this.y)];
+                        if(next_step[0] > 0){
+                            this.x += this.speed;
+                        }
+                        else if(next_step[0] < 0){
+                            this.x -= this.speed;
+                        }
+                        if(next_step[1] > 0){
+                            this.y += this.speed;
+                        }
+                        else if(next_step[1] < 0){
+                            this.y -= this.speed;
+                        }
+                    }
+                    else{
+                        // 羊random走
+                        this.x += getRandomNum(-1, 1) * this.speed;
+                        this.y += getRandomNum(-1, 1) * this.speed;
+                    }
+                }
+            
+        }
+        reproduce(){
+            if (this.energy > 120){
+                let newSheeps = new Sheep();
+                sheeps.push(newSheeps);
+                sheep_num += 1;
+                this.energy -= 50;
+            }
         }
     }    
     // 狼
@@ -63,30 +125,23 @@ window.onload = function(){
         constructor(color, target_x, target_y){
             super();
             this.color = '#857263';
-            // this.target_x = -1;
-            // this.target_y = -1;
-            this.target_index = -1;
+            this.speed = 1.5;
         }
         move(){
             // 狼追羊
-            let distance = [];
+            let WS_distance = [];
             let sheep_dis=[];
+            this.energy -= 0.3;
             if(sheep_num > 0){
-                // 如果沒有目標羊
-                if(this.target_index == -1 || this.target_index == sheep_num){
-                    // 抓最近的羊
-                    for(let n = 0; n < sheep_num; n++){
-                        sheep_dis[n] = (sheeps[n].x-this.x)**2 + (sheeps[n].y - this.y)**2
-                        distance.push(sheep_dis[n]);
-                    }
-                    distance.sort(function(a, b) {
-                        return a - b;
-                    })
-                    this.target_index = sheep_dis.indexOf(distance[0]); // 最近的羊的index
-                    sheeps[this.target_index].color = 'red';
+                // 抓最近的羊
+                for(let n = 0; n < sheep_num; n++){
+                    sheep_dis[n] = (sheeps[n].x-this.x)**2 + (sheeps[n].y - this.y)**2
+                    WS_distance.push(sheep_dis[n]);
                 }
+                WS_distance.sort(function(a, b) {return a - b;})
+                let sheep_target = sheep_dis.indexOf(WS_distance[0]); // 最近的羊的index
 
-                let next_step = [(sheeps[this.target_index].x-this.x), (sheeps[this.target_index].y-this.y)];
+                let next_step = [(sheeps[sheep_target].x-this.x), (sheeps[sheep_target].y-this.y)];
                 if(next_step[0] > 0){
                     this.x += this.speed;
                 }
@@ -99,57 +154,117 @@ window.onload = function(){
                 else if(next_step[1] < 0){
                     this.y -= this.speed;
                 }
-                console.log('target'+this.target_index+":"+ sheeps[this.target_index].x);
-                console.log('next：' + next_step)
+            }
+            else{
+                // 沒有羊就隨便走
+                this.x += getRandomNum(-1, 1) * this.speed;
+                this.y += getRandomNum(-1, 1) * this.speed;
+            }
+        }
+        reproduce(){
+            if (this.energy > 200){
+                let newWolves = new Wolf();
+                wolves.push(newWolves);
+                wolf_num += 1;
+                this.energy -= 80;
             }
         }
     }
 
     // 创建100个動物实例
+    var grass = [];
+    for (let i = 0; i < grass_num; i++) {
+        let newGrass = new Grass();
+        newGrass.draw();
+        grass.push(newGrass);
+    }
     var sheeps = [];
     for (let i = 0; i < sheep_num; i++) {
-        let newSheeps = new Sheep(maxWidth, maxHeight, ctx);
+        let newSheeps = new Sheep();
         newSheeps.draw();
         sheeps.push(newSheeps);
     }
     var wolves = [];
     for (let i = 0; i < wolf_num; i++) {
-        let newWolves = new Wolf(maxWidth, maxHeight, ctx);
+        let newWolves = new Wolf();
         newWolves.draw();
         wolves.push(newWolves);
     }
 
+    // 隨機生成草
+    function grassGrow(n){
+        if(getRandomNum(1, n) == 1){
+            let newGrass = new Grass();
+            grass.push(newGrass);
+            grass_num += 1;
+        }
+    }
+
+    // 羊吃草
+    function eat_grass(g, s){
+        grass_num -= 1;
+        sheeps[s].energy += 10; //羊吃草增加10 energy
+        grass.splice(g, 1);
+        grassGrow(3);
+    }
     // 狼吃羊
     function eat_sheep(s, w){
         sheep_num -= 1;
-        sheeps[s].energy = 0;
-        wolves[w].energy += 30; //狼吃羊增加50 energy
+        wolves[w].energy += sheeps[s].energy/3; //狼吃羊增加羊1/3的energy
         sheeps.splice(s, 1);
-        // wolves[w].target_x = -1;
-        // wolves[w].target_y = -1;
-        wolves[w].target_index = -1;
     }
 
-    // function isDead(){
-        // if(energy )
-    // }
+    function isDead(animals, n){
+        if(animals == wolves){
+            wolf_num -= 1;
+            wolves.splice(n, 1);
+        }
+        else if(animals == sheeps){
+            sheep_num -= 1;
+            sheeps.splice(n, 1);
+        }
+    }
 
     setInterval(() => {
         // 每次画之前都要清除画布
         ctx.clearRect(0, 0, maxWidth, maxHeight);
-        ctx.fillStyle = '#95ef5c';
+        ctx.fillStyle = '#afaa5b';
         ctx.fillRect(0, 0, maxWidth, maxHeight);
+        
+        grassGrow(10);
+        for (let j = 0; j < grass_num; j++) {   
+            grass[j].draw(ctx);
+        }
         for (let j = 0; j < sheep_num; j++) {
-            sheeps[j].draw(ctx);
-            sheeps[j].move();
+            if(sheeps[j].energy > 0){
+                sheeps[j].draw(ctx);
+                sheeps[j].move();
+                sheeps[j].reproduce();
+            }
+            else{
+                isDead(sheeps, j);
+            }
         }
         for (let j = 0; j < wolf_num; j++) {
-            wolves[j].draw(ctx);
-            wolves[j].move();
+            if(wolves[j].energy > 0){
+                wolves[j].draw(ctx);
+                wolves[j].move();
+                wolves[j].reproduce();
+            }
+            else{
+                isDead(wolves, j);
+            }
+        }        
+
+        // 判斷羊有沒有吃到草
+        for (let i = 0; i < grass_num; i++){
+            for (let j = 0; j < sheep_num; j++){
+                if (grass[i].x == sheeps[j].x && grass[i].y == sheeps[j].y){
+                    eat_grass(i, j);
+                }                
+            }
         }
-
-        console.log('sheep:'+sheep_num, 'wolf:'+wolf_num);
-
+        // 判斷狼有沒有吃到羊
         for (let i = 0; i < sheep_num; i++){
             for (let j = 0; j < wolf_num; j++){
                 if (sheeps[i].x == wolves[j].x && sheeps[i].y == wolves[j].y){
@@ -157,8 +272,8 @@ window.onload = function(){
                 }                
             }
         }
-            
+        console.log('grass:'+grass_num, 'sheep:'+sheep_num, 'wolf:'+wolf_num);
 
-    }, 1);
+    }, 10);
 }
 
